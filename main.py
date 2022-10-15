@@ -1,8 +1,8 @@
 #firstly we will need to import some of the library that will help us to drive this project smoothly!
-import requests [know more about the library from here](https://www.w3schools.com/python/module_requests.asp)
-import smtplib [know more about the library from here](https://docs.python.org/3/library/smtplib.html)
-import time [know more about the library from here](https://pypi.org/project/beautifulsoup4/)
-from bs4 import BeautifulSoup [know about the library from here](https://pypi.org/project/beautifulsoup4/)
+import requests 
+import smtplib 
+import time 
+from bs4 import BeautifulSoup 
 
 
 #here you will have to paste the link of the product whose price has to be scrapped. I have set it to the link of amazon, product = iPhone 14proMax
