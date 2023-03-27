@@ -1,55 +1,64 @@
-#firstly we will need to import some of the library that will help us to drive this project smoothly!
-import requests 
-import smtplib 
-import time 
-from bs4 import BeautifulSoup 
+import os
+import time
+import requests
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from configparser import ConfigParser
+from bs4 import BeautifulSoup
 
 
-#here you will have to paste the link of the product whose price has to be scrapped. I have set it to the link of amazon, product = iPhone 14proMax
-URL = 'https://www.amazon.in/iPhone-Pro-Max-256GB-Gold/dp/B0BDK63WMS?ref_=ast_sto_dp'
+# Load configuration file
+config = ConfigParser()
+config.read('config.ini')
 
-#here you will have to paste your "my user agent address", get yours from here http://my-user-agent.com/
-headers = {"User-Agent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36'}
+# Load product URLs from configuration file
+product_urls = config.get('PRODUCTS', 'urls').split(',')
+# Load threshold prices from configuration file
+threshold_prices = [float(p) for p in config.get('PRODUCTS', 'threshold_prices').split(',')]
 
-# this part is for checking the price of the specified link(product link) above
-def check_price():
-    page = requests.get(URL, headers=headers)
+# Load email configuration from environment variables
+email_address = os.environ.get('EMAIL_ADDRESS')
+email_password = os.environ.get('EMAIL_PASSWORD')
+smtp_server = os.environ.get('SMTP_SERVER')
+smtp_port = os.environ.get('SMTP_PORT')
 
-    soup = BeautifulSoup(page.content, 'html.parser')
+# Set user agent string
+user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36'
 
-    title = soup.find(id="productTitle").get_text()
-    price = soup.find(id="priceblock_ourprice").get_text()
-    converted_price = float(price[2:4]+price[5:8])
-#here it is checking if the price of the specified product above is below than 100000 (in this case), you can choose a value of your own.
-    if(converted_price < 100000):
-        send_mail()
-#if the condition (value of the product goes below than 100000), then it will proccess further
-    print(converted_price)
-    print(title.strip())
+def check_prices():
+    for i, url in enumerate(product_urls):
+        # Make request to product URL with user agent string
+        response = requests.get(url, headers={'User-Agent': user_agent})
+        # Parse response with BeautifulSoup
+        soup = BeautifulSoup(response.content, 'html.parser')
+        # Get product title
+        title = soup.find(id="productTitle").get_text().strip()
+        # Get product price and convert to float
+        price_str = soup.find(id="priceblock_ourprice").get_text().strip()
+        price = float(price_str[2:].replace(',', ''))
+        # Check if product price is below threshold
+        if price < threshold_prices[i]:
+            # Send email notification
+            send_email(title, url, price)
 
-#function for sending email to the user when the prices fell for a product
-def send_mail():
-    server = smtplib.SMTP('smtp.gmail.com', 587)
-    server.ehlo() # EHLO is a command sent by an email server to identify itself when connecting to another email
-    server.starttls()
-    server.ehlo()
+def send_email(title, url, price):
+    # Create message object
+    message = MIMEMultipart()
+    message['From'] = email_address
+    message['To'] = email_address
+    message['Subject'] = 'Price Alert: {} - {:.2f}'.format(title, price)
+    # Create message body
+    body = 'The price of {} is now below the threshold price of {:.2f}. You can buy it here: {}'.format(title, threshold_prices[i], url)
+    message.attach(MIMEText(body, 'plain'))
+    # Connect to SMTP server and send email
+    with smtplib.SMTP(smtp_server, smtp_port) as server:
+        server.starttls()
+        server.login(email_address, email_password)
+        server.sendmail(email_address, email_address, message.as_string())
+    print('Email sent for product: {}'.format(title))
 
-    server.login('peacekeeper0907@gmail.com', 'Google app password here')
-    #server.login('Your gmail account', 'Google app password here')
-
-    subject = 'Hello PEACE, the product you were looking for is now available for 100000!'
-    body = 'Hello PEACE, its been along. I have got a good news for you, the product [iPhone 14proMax is now available for 100000. Get it ASAP, before the offer goes out. Link here:- https://www.amazon.in/iPhone-Pro-Max-256GB-Gold/dp/B0BDK63WMS?ref_=ast_sto_dp]'
-
-    msg = f"Subject: {subject}\n\n{body}"
-
-    server.sendmail('peacekeeper0907@gmail.com', 'peacekeeper0907@gmail.com', msg)
-    #server.sendmail('A mail address from where mail has to be sent', 'target mail address, where mail has to be received!', msg/ you can type a message of your own here too but we have simply made a variable above and defined the message there to make it look clean!)
-    
-    print("The email has been successfully to peacekeeper0907@gmail.com!")
-
-    server.quit()
-
-while(True):
-    check_price()
+# Schedule check_prices() function to run every hour
+while True:
+    check_prices()
     time.sleep(3600)
-#time here is in seconds, please convert the time to seconds first and then fill it in here. You can use https://www.inchcalculator.com/time-to-seconds-calculator/
